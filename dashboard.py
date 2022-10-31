@@ -1,0 +1,178 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[2]:
+
+
+import streamlit as st
+import pandas as pd
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+from datetime import datetime
+import pandas as pd
+import plotly.express as px
+import pmdarima as pm
+# In[9]:
+nav=st.sidebar.radio(
+    "Cash flow forecasting using Time series",
+    
+    ["About","Dashboard","Forecast"]
+    )
+
+
+# In[9]:
+if nav=="About":
+    st.title('Cash Flow Forecasting Using Time Series')
+    st.header("Introduction")
+    st.markdown('Cash flow forecasting is the process of estimating the flow of cash in and out of a business over a specific period. An          accurate cash flow forecast helps companies predict future cash positions, avoid crippling cash shortages, and earn returns on any cash surpluses they may have in the most efficient manner possible.')
+    st.header("Determine Your Forecasting Objective")
+    st.markdown('To ensure you see actionable business insights from a cash flow forecast, you should start with determining the business objective that the forecast should support. Most commonly we use cash forecasts for the following objectives.')
+    st.markdown('•	Short-term liquidity planning: Managing the amount of cash available on a day-to-day basis to ensure your business can meet its short-term obligations.  \n •	Interest and debt reduction: Ensuring the business has enough cash on hand to make payments on any loans or debt they’ve taken on.  \n•	Covenant and key date visibility: Projecting your cash levels for key reporting dates such as year, quarter, or month-end.  \n•	Liquidity risk management: Creating visibility into potential liquidity issues that could arise in the future, so you have more time to address them.  \n•	Growth planning: Ensuring the business has enough working capital on hand to fund activities that will help grow revenues in the future.  \nThe right objective to build a forecast is to support business operations. For example, businesses with debt will find value in creating a cash forecast that helps them prepare for payments they need to make. But they may not have a need to build a forecast that supports short-term liquidity planning unless they’re also tight on cash.')
+    st.header("Choose Your Forecasting Period")
+    st.markdown('Once you’ve determined the business objective you hope to support with a cash flow forecast, the next thing to consider is how far into the future your forecast will look.  \nGenerally, there’s a trade-off between the availability of information and forecast duration. That means the further into the future the forecast looks, the less detailed or accurate it’s likely to be. So, choosing the right reporting period can have a big impact on the accuracy and reliability of your forecast.  \nThis web application uses time series to forecast the cash flow statement. The web application can create dashboard and forecast the cash flow of the organisation. The dashboard tab helps the organisation understand the data and the forecast tab helps them forecast the different parts of the cashflow statement.')
+    
+    
+
+
+# In[4]:
+
+if nav=="Dashboard":
+    st.title("Dashboard")
+    st.write('Import data')
+    data=st.file_uploader("Upload your csv data here",type="csv")
+    if data is not None:
+        appdata = pd.read_csv(data)
+        appdata['DT'] = pd.to_datetime(appdata['DT'])
+        appdata['DT'] = appdata['DT'].dt.date
+        dt=appdata.set_index('DT')
+        st.write(dt)
+    
+    if data is not None:
+        c=st.multiselect(
+        "Select the coloumn you want to Vizualise",
+        options=dt.columns)
+        df=dt[c]
+        x=int(st.number_input('How many Years/Quaters of data you want to Vizulise'))
+        df1=df.tail(x)
+        st.write(df1)
+        st.line_chart(df1)
+        st.bar_chart(df1)
+
+# In[4]:
+if nav=="Forecast":
+    st.title("Forecasting Cash flow statements")
+    st.write('Import the data you want to forecast')
+    data=st.file_uploader("Upload your csv data here",type="csv")
+    if data is not None:
+        appdata = pd.read_csv(data)
+        appdata['DT'] = pd.to_datetime(appdata['DT'])
+        #appdata['DT'] = appdata['DT'].dt.date
+        dt=appdata.set_index('DT')
+        st.write(dt)
+        genre = st.radio(
+    "Do you want to check for any null values in the dataset?",
+    ('Yes', 'No'))
+        
+
+        if genre == 'Yes':
+            
+            st.write('Below table represents the sum of Null values for each row in the dataset',dt.isnull().sum())
+            
+        else:
+            st.write('')
+        ll = st.radio(
+    "Replace Null values by.",
+    ('Removing Null values', 'Replacing null values using the mean','Leave null values as it is'))
+        
+            
+        if ll == 'Removing Null values':
+            
+            e=dt.dropna()
+               
+        elif ll == 'Replacing null values using the mean':
+            e=dt.fillna(dt.mean())  
+        else:
+            e=dt
+        st.write(e)
+        if data is not None:
+            c=st.selectbox(
+        "Select the coloumn which you want to forecast",
+        options=dt.columns)
+            st.write("")
+            x=int(st.number_input('Enter the number of periods in each season.For example, number of periods is 4 for quarterly data, 12 for monthly data, or 1 for annual (non-seasonal) data.'))
+            
+            e=e[c]
+            st.write(e)
+            model=pm.auto_arima(e,
+                   m=x,seasonal=True,
+                   start_p=0,start_q=0,max_order=5,test='adf',error_action='ignore',
+                   suppress_warnings=True,
+                   stepwise=True,Trace=True)
+            size=round(int(len(e))*0.8)
+            train=e.iloc[:size]
+            test=e.iloc[size:]
+            
+            model.fit(train)
+            zy=int(len(test))
+                     
+            forecast=model.predict(n_periods=zy,return_conf_int=True)
+            forecast_df=pd.DataFrame(forecast[0],index=test.index,columns=["Prediction"])
+            #st.write(forecast_df)
+            bb=pd.concat([e,forecast_df],axis=1)
+            st.subheader('The below graph shows how well the predicted result fits the dataset')
+            st.line_chart(bb)
+            w=int(st.number_input('Enter the number of periods you want to forecast.'))
+            cc=st.selectbox(
+        "Select the Frequency of dates",
+        ('Yearly','Monthly','Quaterly'))
+            if cc=='Yearly':
+                fre='y'
+            elif cc=='Monthly':
+                fre='m'
+            else:
+                fre='q'
+            pp=test.reset_index()
+            
+            im=pp.iloc[0]["DT"]
+            import datetime
+            date_string=im.strftime('%Y-%m-%d')
+                     
+             
+            forecast1=model.predict(n_periods=w,return_conf_int=True)
+            forecast_range=pd.date_range(start=date_string,periods=w,freq=fre)
+            forecast1_df=pd.DataFrame(forecast1[0],index=forecast_range,columns=["Prediction"])
+            oo=pd.concat([e,forecast1_df],axis=1)
+            st.subheader('Forecasted Results')
+            st.line_chart(oo)
+            
+            
+            
+            
+            
+            
+            
+
+            
+            
+            
+            
+        
+
+            
+        
+            
+        
+    
+            
+    
+
+                              
+            
+                              
+                     
+                     
+                     
+        
+            
+    
